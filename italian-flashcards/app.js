@@ -379,12 +379,29 @@ function deleteCard(id) {
   renderDeckTable();
 }
 
-function exportDeck() {
-  const blob = new Blob([JSON.stringify(cards, null, 2)], { type: "application/json" });
+async function exportDeck() {
+  const filename = "italian-flashcards-deck.json";
+  const json = JSON.stringify(cards, null, 2);
+
+  if (window.claude && window.claude.use) {
+    const downloads = await window.claude.use("downloads");
+    if (downloads) {
+      try {
+        await downloads.save({ filename, data: json });
+      } catch (err) {
+        if (!err || err.code !== "declined") {
+          alert("Couldn't save the file: " + (err && (err.message || err.code)));
+        }
+      }
+      return;
+    }
+  }
+
+  const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "italian-flashcards-deck.json";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
