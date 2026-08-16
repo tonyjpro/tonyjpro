@@ -33,21 +33,27 @@ Each card moves through two tiers, similar to Anki:
 
 ### Where response time comes in
 
-Every card tracks a rolling average of *your own* correct-answer times for
-that specific word. Each new answer is graded 0–5 (SM-2 style "quality"),
-based on speed relative to that personal baseline, not a fixed clock:
+Every answer is graded 0–5 (SM-2 style "quality") against a flat response
+time bar, not a per-card average. Every card uses the same 6-choice format,
+so the "read the options" overhead is roughly constant from card to card —
+a fixed cutoff is a fairer "do you actually know this" signal than
+comparing against your own past pace on that specific word:
 
 | Your answer | Quality | Effect |
 |---|---|---|
-| Correct, well under your average time | 5 | Interval grows the most; card graduates fastest |
-| Correct, around your average time | 4 | Normal interval growth |
-| Correct, but noticeably slower than usual | 3 | Passes, but interval barely grows and the card is drilled again later in this same session |
+| Correct, under 1 second | 5 | Interval grows the most; card graduates fastest |
+| Correct, under 2 seconds | 4 | Normal interval growth |
+| Correct, but 2 seconds or slower | 3 | Counts as "you don't really know this yet" — barely grows the interval, and the card keeps circulating |
 | Incorrect (or "I don't know") | 0 | Resets to the learning queue, interval drops to 0, ease is penalized |
 
-That's the "if I don't know it as quickly, drill it more" behavior: speed
-is only ever compared against how *you* answer that word once you know it,
-so a naturally longer word isn't penalized against a short one — only
-against your own past performance on it.
+Anything scoring below quality 4 — a miss, or a correct answer that took 2
+seconds or longer — doesn't just get shown again once. With six choices on
+screen, a single lucky guess after a miss is a real possibility, so a card
+that's ever scored below 4 has to be answered cleanly (under 2 seconds)
+**three times in a row** before it's treated as consolidated and stops
+circulating. Any wobble — a miss, or another slow answer — resets that
+count. That's the "if I don't know it fast enough, keep drilling it until
+I really do" behavior.
 
 The scheduler itself lives in `srs.js` and has no UI dependencies —
 `srs.test.mjs` covers it directly with `node --test`.

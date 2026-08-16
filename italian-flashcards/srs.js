@@ -7,11 +7,14 @@
 //     (days), so well-known words are shown less and less often.
 //
 // The extra ingredient: correctness alone is graded into a 0-5 "quality"
-// score by comparing this answer's response time against a per-card rolling
-// average of that card's own past correct answers. Answering faster than
-// your own average pushes the interval out further; answering slower (but
-// still correct) barely grows it and keeps the card in frequent rotation a
-// bit longer; an incorrect answer resets it into the learning queue.
+// score using a flat response-time bar, not a per-card average. Every card
+// is answered from the same 6-choice format, so the read-the-options
+// overhead is roughly constant card to card -- a fixed cutoff is a fairer
+// "do you actually know this" signal than comparing to your own past pace
+// on that specific word. Answering well under the bar pushes the interval
+// out the most; answering correctly but slower barely grows it and keeps
+// the card in frequent rotation until it's passed cleanly several times in
+// a row; an incorrect answer resets it into the learning queue.
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const MINUTE_MS = 60 * 1000;
@@ -25,13 +28,15 @@ export const GRADUATING_INTERVAL_DAYS = 1;
 export const MIN_EASE = 1.3;
 export const STARTING_EASE = 2.5;
 
-// Absolute fallback thresholds, used only until a card has a personal
-// average time to compare against (i.e. its first correct answer).
-export const DEFAULT_FAST_MS = 3000;
-export const DEFAULT_SLOW_MS = 8000;
+// Flat response-time bar: answer well under this and it counts as "you
+// know it" (quality 5); answer under it but not blazing fast, still solid
+// (quality 4); answer at or past it (even if correct) counts as "you don't
+// really know this yet" and the card goes back into frequent rotation.
+export const INSTANT_MS = 1000;
+export const KNOWN_MS = 2000;
 
 // Weight for the exponential moving average of a card's response time.
-// Higher = more weight on the most recent answer.
+// Purely informational (shown in the deck manager) -- not used for grading.
 const TIME_EWMA_ALPHA = 0.3;
 
 export function createCard({ id, front, back, now = Date.now() }) {
@@ -52,17 +57,14 @@ export function createCard({ id, front, back, now = Date.now() }) {
 }
 
 /**
- * Grades a single answer into an SM-2 style quality score (0-5), using the
- * card's own historical average correct-answer time as the "fast" baseline.
+ * Grades a single answer into an SM-2 style quality score (0-5) using a
+ * flat response-time bar: under KNOWN_MS counts as known, at or past it
+ * (even if correct) counts as not confidently known yet.
  */
-export function computeQuality(correct, responseMs, avgTimeMs) {
+export function computeQuality(correct, responseMs) {
   if (!correct) return 0;
-
-  const fastCutoff = avgTimeMs == null ? DEFAULT_FAST_MS : avgTimeMs * 0.6;
-  const slowCutoff = avgTimeMs == null ? DEFAULT_SLOW_MS : avgTimeMs * 1.15;
-
-  if (responseMs <= fastCutoff) return 5;
-  if (responseMs <= slowCutoff) return 4;
+  if (responseMs <= INSTANT_MS) return 5;
+  if (responseMs <= KNOWN_MS) return 4;
   return 3;
 }
 
@@ -80,7 +82,7 @@ function nextAvgTime(avgTimeMs, responseMs) {
  * rather than waiting for its persisted `due` timestamp.
  */
 export function schedule(card, { correct, responseMs, now = Date.now() }) {
-  const quality = computeQuality(correct, responseMs, card.avgTimeMs);
+  const quality = computeQuality(correct, responseMs);
   const updated = { ...card };
 
   if (quality < 3) {

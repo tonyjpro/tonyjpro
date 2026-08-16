@@ -9,26 +9,21 @@ import {
   MINUTE_MS,
   LEARNING_STEPS_MS,
   GRADUATING_INTERVAL_DAYS,
+  INSTANT_MS,
+  KNOWN_MS,
 } from "./srs.js";
 
 const NOW = 1_700_000_000_000;
 
 test("computeQuality: incorrect is always 0 regardless of speed", () => {
-  assert.equal(computeQuality(false, 100, null), 0);
-  assert.equal(computeQuality(false, 100, 5000), 0);
+  assert.equal(computeQuality(false, 100), 0);
+  assert.equal(computeQuality(false, 5000), 0);
 });
 
-test("computeQuality: uses absolute thresholds with no baseline yet", () => {
-  assert.equal(computeQuality(true, 1000, null), 5);
-  assert.equal(computeQuality(true, 5000, null), 4);
-  assert.equal(computeQuality(true, 9000, null), 3);
-});
-
-test("computeQuality: uses the card's own average once it has one", () => {
-  const avg = 4000;
-  assert.equal(computeQuality(true, 2000, avg), 5); // well under avg
-  assert.equal(computeQuality(true, 4200, avg), 4); // near avg
-  assert.equal(computeQuality(true, 8000, avg), 3); // well over avg
+test("computeQuality: uses a flat response-time bar, not a per-card average", () => {
+  assert.equal(computeQuality(true, INSTANT_MS - 200), 5); // near-instant
+  assert.equal(computeQuality(true, (INSTANT_MS + KNOWN_MS) / 2), 4); // under the bar, not instant
+  assert.equal(computeQuality(true, KNOWN_MS + 500), 3); // at/past the "known" bar
 });
 
 test("a new card starts in the learning queue and is due immediately", () => {
@@ -52,7 +47,7 @@ test("fast correct answers advance faster than slow correct answers", () => {
   assert.equal(fast.interval, GRADUATING_INTERVAL_DAYS);
   assert.equal(slow.interval, GRADUATING_INTERVAL_DAYS);
 
-  // Now diverge: one keeps answering fast (relative to its own avg), the
+  // Now diverge: one keeps answering well under the "known" bar, the
   // other answers slow-but-correct every time.
   for (let i = 0; i < 3; i++) {
     fast = schedule(fast, { correct: true, responseMs: 400, now: NOW }).card;
@@ -93,10 +88,9 @@ test("an incorrect answer resets a graduated card back into learning", () => {
 
 test("a slow-but-correct answer still passes but gets requeued in-session", () => {
   const card = createCard({ id: "1", front: "casa", back: "house", now: NOW });
-  const warmed = schedule(card, { correct: true, responseMs: 500, now: NOW }).card;
-  const { card: after, quality, sessionRequeue } = schedule(warmed, {
+  const { card: after, quality, sessionRequeue } = schedule(card, {
     correct: true,
-    responseMs: warmed.avgTimeMs * 2,
+    responseMs: KNOWN_MS + 500, // at/past the "known" bar
     now: NOW,
   });
   assert.equal(quality, 3);

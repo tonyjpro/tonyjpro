@@ -138,9 +138,10 @@ function topUpDeck() {
 // session stops feeding you more and wraps up instead of padding out
 // to the ceiling regardless.
 
-const INITIAL_NEW_BATCH = 10; // new cards to seed the queue with before adapting
+const INITIAL_NEW_BATCH = 5; // new cards to seed the queue with before adapting
 const MASTERY_STREAK_LEN = 6; // consecutive clean passes that signal "you've got this"
 const MAX_CONCURRENT_STRUGGLING = 4; // pause new intake once this many cards are actively being drilled
+const REPS_TO_CONSOLIDATE = 3; // consecutive clean passes a missed/slow card needs before it's considered locked in
 
 function pickDirection(cardSetting) {
   if (cardSetting === "mixed") return Math.random() < 0.5 ? "it-en" : "en-it";
@@ -181,6 +182,7 @@ function startSession() {
     newIntroduced: initialNewCount,
     newCeiling: ceiling,
     strugglingIds: new Set(),
+    cleanStreaks: new Map(), // per-card count of consecutive clean passes since its last miss/slow answer
     streak: 0,
     stats: { seen: 0, correct: 0, totalMs: 0 },
     current: null,
@@ -190,6 +192,12 @@ function startSession() {
   summaryPanel.hidden = true;
   cardPanel.hidden = false;
   showCurrentCard();
+}
+
+function requeueCardSoon(cardId) {
+  const offset = 3 + Math.floor(Math.random() * 4); // 3-6 cards later
+  const insertAt = Math.min(session.index + offset, session.queue.length);
+  session.queue.splice(insertAt, 0, cardId);
 }
 
 function maybeIntroduceNewCard() {
@@ -304,13 +312,25 @@ function gradeAnswer(correct, chosenBtnEl) {
 
   if (result.sessionRequeue) {
     session.strugglingIds.add(card.id);
+    session.cleanStreaks.set(card.id, 0);
     session.streak = 0;
-    const offset = 3 + Math.floor(Math.random() * 4); // 3-6 cards later
-    const insertAt = Math.min(session.index + offset, session.queue.length);
-    session.queue.splice(insertAt, 0, card.id);
+    requeueCardSoon(card.id);
   } else {
-    session.strugglingIds.delete(card.id);
     session.streak++;
+    if (session.strugglingIds.has(card.id)) {
+      // This card was missed or hesitant earlier this session — one clean
+      // pass isn't enough proof (with 6-way multiple choice, it could be a
+      // lucky guess), so keep it circulating until it's passed cleanly
+      // several times in a row.
+      const cleanCount = (session.cleanStreaks.get(card.id) || 0) + 1;
+      if (cleanCount < REPS_TO_CONSOLIDATE) {
+        session.cleanStreaks.set(card.id, cleanCount);
+        requeueCardSoon(card.id);
+      } else {
+        session.strugglingIds.delete(card.id);
+        session.cleanStreaks.delete(card.id);
+      }
+    }
   }
 
   maybeIntroduceNewCard();
