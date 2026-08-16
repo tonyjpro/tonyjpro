@@ -146,20 +146,23 @@ input[type="number"] {
   cursor: default;
 }
 
+.card-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
 .session-progress {
   color: var(--text-dim);
   font-size: 0.85rem;
-  margin-bottom: 0.75rem;
-  text-align: center;
 }
 
 .card-prompt-label {
-  text-align: center;
   color: var(--text-dim);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 0.3rem;
 }
 
 .card-prompt {
