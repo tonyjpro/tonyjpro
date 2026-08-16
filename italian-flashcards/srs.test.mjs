@@ -7,6 +7,7 @@ import {
   isLearning,
   DAY_MS,
   LEARNING_STEPS_MS,
+  MISS_RECOVERY_STEPS_MS,
 } from "./srs.js";
 
 const NOW = 1_700_000_000_000;
@@ -67,12 +68,20 @@ test("an incorrect answer resets a graduated card back into learning and requeue
   assert.equal(isLearning(afterMiss), true);
   assert.equal(afterMiss.repetitions, 0);
   assert.equal(afterMiss.interval, 0);
-  assert.equal(afterMiss.due, NOW + LEARNING_STEPS_MS[0]);
+  assert.equal(afterMiss.learningTrack, "recovery");
+  assert.equal(afterMiss.due, NOW + MISS_RECOVERY_STEPS_MS[0]);
   assert.ok(afterMiss.ease < card.ease);
   assert.equal(sessionRequeue, true);
 });
 
-test("after a miss, a card needs the full learning-step sequence again before it drops off", () => {
+test("recovery from a miss requires more clean passes than a brand-new card", () => {
+  assert.ok(
+    MISS_RECOVERY_STEPS_MS.length > LEARNING_STEPS_MS.length,
+    "a missed word should need real reinforcement, not just one lucky guess"
+  );
+});
+
+test("after a miss, a card needs the full recovery-step sequence before it drops off", () => {
   let card = createCard({ id: "1", front: "casa", back: "house", now: NOW });
   for (let i = 0; i < LEARNING_STEPS_MS.length; i++) {
     card = schedule(card, { correct: true, responseMs: 100, now: NOW }).card;
@@ -82,15 +91,28 @@ test("after a miss, a card needs the full learning-step sequence again before it
   card = schedule(card, { correct: false, responseMs: 100, now: NOW }).card; // miss
   assert.equal(isLearning(card), true);
   assert.equal(card.learningStep, 0);
+  assert.equal(card.learningTrack, "recovery");
 
-  for (let i = 0; i < LEARNING_STEPS_MS.length - 1; i++) {
+  for (let i = 0; i < MISS_RECOVERY_STEPS_MS.length - 1; i++) {
     const result = schedule(card, { correct: true, responseMs: 100, now: NOW });
     card = result.card;
-    assert.equal(result.sessionRequeue, true);
+    assert.equal(result.sessionRequeue, true, `recovery step ${i} should still be requeued`);
   }
   const final = schedule(card, { correct: true, responseMs: 100, now: NOW });
   assert.equal(final.sessionRequeue, false);
   assert.equal(isLearning(final.card), false);
+});
+
+test("a miss during recovery restarts the recovery sequence from the top", () => {
+  let card = createCard({ id: "1", front: "verde", back: "green", now: NOW });
+  card = schedule(card, { correct: false, responseMs: 100, now: NOW }).card; // initial miss
+  card = schedule(card, { correct: true, responseMs: 100, now: NOW }).card; // one clean pass in
+  assert.equal(card.learningStep, 1);
+
+  card = schedule(card, { correct: false, responseMs: 100, now: NOW }).card; // miss again mid-recovery
+  assert.equal(card.learningStep, 0);
+  assert.equal(card.learningTrack, "recovery");
+  assert.equal(card.due, NOW + MISS_RECOVERY_STEPS_MS[0]);
 });
 
 test("a correct answer on an already-graduated card is not requeued in-session", () => {

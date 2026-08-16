@@ -199,8 +199,12 @@ function startSession() {
   showCurrentCard();
 }
 
-function requeueCardSoon(cardId) {
-  const offset = 3 + Math.floor(Math.random() * 4); // 3-6 cards later
+function requeueCardSoon(cardId, tight) {
+  // A card recovering from a miss comes back much sooner than a fresh
+  // card's own learning-step passes -- dense reinforcement (roughly every
+  // 2-3 cards) while it's actually being relearned, not the wider default
+  // spacing used for ordinary in-progress cards.
+  const offset = tight ? 2 + Math.floor(Math.random() * 2) : 3 + Math.floor(Math.random() * 4);
   const insertAt = Math.min(session.index + offset, session.queue.length);
   session.queue.splice(insertAt, 0, cardId);
 }
@@ -215,7 +219,10 @@ function maybeIntroduceNewCard() {
 
   const nextId = session.newPool.shift();
   session.newIntroduced++;
-  const offset = 2 + Math.floor(Math.random() * 3); // 2-4 cards ahead
+  // Deliberately further out than a recovery card's tight 2-3 offset (see
+  // requeueCardSoon), so drip-feeding new material doesn't keep bumping a
+  // card that's actively being relearned further back in the queue.
+  const offset = 4 + Math.floor(Math.random() * 3); // 4-6 cards ahead
   const insertAt = Math.min(session.index + offset, session.queue.length);
   session.queue.splice(insertAt, 0, nextId);
 }
@@ -331,10 +338,10 @@ function gradeAnswer(correct, chosenBtnEl) {
 
   if (result.sessionRequeue) {
     // Either a miss, or the card hasn't cleared every learning step yet --
-    // srs.js already encodes "needs another clean pass" in that flag, so
-    // there's nothing extra to track here.
+    // srs.js already encodes "needs another clean pass" (and which track
+    // it's on) in the card, so there's nothing extra to track here.
     session.strugglingIds.add(card.id);
-    requeueCardSoon(card.id);
+    requeueCardSoon(card.id, result.card.learningTrack === "recovery");
   } else {
     session.strugglingIds.delete(card.id);
   }
@@ -347,7 +354,10 @@ function gradeAnswer(correct, chosenBtnEl) {
   // you're doing great would never detect its own mastery.
   session.streak = correct ? session.streak + 1 : 0;
 
-  maybeIntroduceNewCard();
+  // Skip drip-feeding new material on the exact step a miss just happened --
+  // that's the moment the just-requeued card most needs a clear path back
+  // to the front of the queue, not more competition for the same slots.
+  if (correct) maybeIntroduceNewCard();
 
   showFeedback(correct, answerText, result.sessionRequeue);
 }
@@ -432,7 +442,9 @@ function renderDeckTable() {
     const tr = document.createElement("tr");
 
     const status = isLearning(card)
-      ? { text: "Learning", cls: "status-learning" }
+      ? card.learningTrack === "recovery"
+        ? { text: "Recovering", cls: "status-learning" }
+        : { text: "Learning", cls: "status-learning" }
       : isMastered(card)
       ? { text: "Mastered", cls: "status-mastered" }
       : { text: `Review (${card.interval}d)`, cls: "status-review" };

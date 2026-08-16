@@ -25,12 +25,10 @@ tiny built-in static server — no dependencies required beyond Node.)
 Each card moves through two tiers, similar to Anki:
 
 - **Learning** — a new or recently-missed card. It has to be answered
-  correctly through *every* learning step (currently 2: 1 min, then 10
-  min) before it graduates, and each of those passes is also interleaved
-  a few cards later within the *same session* — so a fresh word sticks
-  around for a couple of exposures rather than vanishing the instant you
-  get it right once, and a miss resets it to the first step, requiring
-  those same couple of clean passes again before it drops off.
+  correctly through *every* learning step before it graduates, and each of
+  those passes is also interleaved back into the queue within the *same
+  session* — so a word sticks around for a couple of exposures rather than
+  vanishing the instant you get it right once.
 - **Review** — a graduated card on a growing interval, in days. Each
   correct review multiplies the interval by an ease factor. Since grading
   is correctness-only (see below), that growth is the plain, gradual SM-2
@@ -42,6 +40,24 @@ Grading is binary: correct (a solid pass) or incorrect/"I don't know" (a
 miss — full reset, and the card recycles). Response time isn't measured
 against the grade at all — see "Ideas for later" for why, and where a
 time-based signal is headed next.
+
+### A miss gets more reinforcement than a fresh word does
+
+A brand-new card and a recently-missed card aren't treated the same:
+
+- A **new** card just needs to clear 2 learning steps to graduate, and
+  gets interleaved back into the queue at a normal pace (~3-6 cards later
+  each time) — kept short on purpose so a session doesn't front-load too
+  much repetition for words you're only meeting for the first time.
+- A card that's just been **missed** — via a wrong pick or "I don't
+  know", it doesn't matter which — switches onto a longer 3-step recovery
+  track instead, *and* gets reinserted much closer together (~2-3 cards
+  later each time). In practice that means a missed word shows up roughly
+  3 times within the next 6-7 cards: real reinforcement, not just one
+  lucky guess on a 6-way multiple choice getting it waved through. Missing
+  it again at any point during recovery resets the count back to the
+  start. Only once it's cleared all 3 recovery passes does it hand off to
+  the normal, gradually-widening review schedule.
 
 The scheduler itself lives in `srs.js` and has no UI dependencies —
 `srs.test.mjs` covers it directly with `node --test`.

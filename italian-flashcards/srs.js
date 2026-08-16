@@ -7,12 +7,15 @@
 //   - "review" cards are graduated cards on a growing SM-2 style interval
 //     (days), so well-known words are shown less and less often.
 //
-// A card has to be answered correctly through *every* learning step (see
-// LEARNING_STEPS_MS) before it's allowed to leave the current session's
-// rotation -- so a freshly-introduced word sticks around for a couple of
-// passes rather than vanishing the instant you get it right once, and a
-// miss resets it back to the first step, which naturally requires those
-// same couple of clean passes again before it drops off. Once graduated,
+// A card has to be answered correctly through *every* learning step before
+// it's allowed to leave the current session's rotation. A brand-new card
+// uses the shorter LEARNING_STEPS_MS track (so a session doesn't front-load
+// too much repetition for words you're seeing for the first time). A miss
+// -- on any card, new or previously graduated -- switches it onto the
+// longer MISS_RECOVERY_STEPS_MS track instead: a missed word needs real
+// reinforcement, not just one lucky guess, so it takes more clean passes to
+// earn its way back out, and the app layer (see app.js) also reinserts a
+// recovering card much closer together than a fresh one. Once graduated,
 // growth is the plain SM-2 progression (1 day, 6 days, then interval*ease),
 // which is gradual by construction -- there's no separate "fast track."
 //
@@ -32,6 +35,11 @@ export const MINUTE_MS = 60 * 1000;
 // graduates into the long-term review schedule.
 export const LEARNING_STEPS_MS = [1 * MINUTE_MS, 10 * MINUTE_MS];
 
+// Same idea, but for a card recovering from a miss: one more step than a
+// brand-new card gets, since "got it right once after missing it" is weak
+// evidence on a 6-way multiple choice -- it could just be a lucky guess.
+export const MISS_RECOVERY_STEPS_MS = [1 * MINUTE_MS, 5 * MINUTE_MS, 10 * MINUTE_MS];
+
 export const GRADUATING_INTERVAL_DAYS = 1;
 export const MIN_EASE = 1.3;
 export const STARTING_EASE = 2.5;
@@ -48,7 +56,8 @@ export function createCard({ id, front, back, now = Date.now() }) {
     repetitions: 0,
     interval: 0,
     ease: STARTING_EASE,
-    learningStep: 0, // index into LEARNING_STEPS_MS; null once graduated
+    learningStep: 0, // index into the current track's steps array; null once graduated
+    learningTrack: "new", // "new" (LEARNING_STEPS_MS) or "recovery" (MISS_RECOVERY_STEPS_MS)
     avgTimeMs: null,
     due: now,
     lastReviewed: null,
@@ -88,12 +97,16 @@ export function schedule(card, { correct, responseMs, now = Date.now() }) {
     updated.interval = 0;
     updated.ease = Math.max(MIN_EASE, card.ease - 0.2);
     updated.learningStep = 0;
-    updated.due = now + LEARNING_STEPS_MS[0];
+    updated.learningTrack = "recovery";
+    updated.due = now + MISS_RECOVERY_STEPS_MS[0];
   } else if (card.learningStep != null) {
+    const track = card.learningTrack === "recovery" ? "recovery" : "new";
+    const steps = track === "recovery" ? MISS_RECOVERY_STEPS_MS : LEARNING_STEPS_MS;
     const nextStep = card.learningStep + 1;
-    if (nextStep < LEARNING_STEPS_MS.length) {
+    if (nextStep < steps.length) {
       updated.learningStep = nextStep;
-      updated.due = now + LEARNING_STEPS_MS[nextStep];
+      updated.learningTrack = track;
+      updated.due = now + steps[nextStep];
     } else {
       updated.learningStep = null;
       updated.repetitions = 1;
@@ -120,9 +133,10 @@ export function schedule(card, { correct, responseMs, now = Date.now() }) {
   updated.totalCorrect = card.totalCorrect + (correct ? 1 : 0);
 
   // Requeue in-session on a miss, or if the card hasn't cleared every
-  // learning step yet -- so a fresh word needs a couple of clean passes
-  // before it's allowed to drop off, and a miss requires those same couple
-  // of passes again (learningStep resets to 0 above) before it does.
+  // learning step yet -- so a fresh word needs its (shorter) track's worth
+  // of clean passes before it's allowed to drop off, and a miss switches it
+  // onto the longer recovery track, requiring those extra passes before it
+  // does.
   const sessionRequeue = quality < 4 || updated.learningStep != null;
 
   return { card: updated, quality, sessionRequeue };
