@@ -63,7 +63,11 @@ function loadCards() {
 }
 
 function saveCards() {
-  localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
+  try {
+    localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
+  } catch (e) {
+    console.warn("Failed to save cards to storage", e);
+  }
 }
 
 function loadSettings() {
@@ -77,7 +81,11 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.warn("Failed to save settings to storage", e);
+  }
 }
 
 function shuffle(arr) {
