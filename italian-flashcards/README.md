@@ -93,3 +93,15 @@ itself topped up from there.
 - `app.js` — session logic, deck management, persistence
 - `index.html` / `style.css` — UI
 - `server.js` — zero-dependency static file server
+
+## Ideas for later (not built yet)
+
+- **Timed lifeline / decaying-score answering**, inspired by a trivia game:
+  after ~2-3 seconds with no answer, grey out 2 of the wrong choices as a
+  "you should know this by now" hint; after another 1-2 seconds, grey out
+  2 more. Pair it with a points system where faster answers score higher
+  and each hint reveal cuts the max possible score. This is a scoring/UX
+  layer on top of answering — separate from the SRS scheduling itself, so
+  it needs a decision on whether an answer given after a hint appeared
+  should also grade as a lower SM-2 quality (probably yes, since needing
+  the hint is itself a sign you didn't know it fast).
