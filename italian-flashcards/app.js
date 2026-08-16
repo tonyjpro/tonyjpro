@@ -45,6 +45,8 @@ const feedbackVerdict = el("feedback-verdict");
 const feedbackAnswer = el("feedback-answer");
 const feedbackQuality = el("feedback-quality");
 const directionSelect = el("direction-select");
+const dontKnowBtn = el("dont-know");
+const nextCardBtn = el("next-card");
 
 function loadCards() {
   try {
@@ -248,6 +250,9 @@ function showCurrentCard() {
   promptLabel.textContent = direction === "it-en" ? "Italian" : "English";
   cardPrompt.textContent = promptText;
   feedbackEl.hidden = true;
+  dontKnowBtn.hidden = false;
+  dontKnowBtn.disabled = false;
+  nextCardBtn.hidden = true;
 
   const choices = buildChoices(card, answerField, answerText);
   renderChoices(choices);
@@ -348,7 +353,10 @@ function showFeedback(correct, answerText, sessionRequeue) {
   feedbackVerdict.className = "feedback-verdict " + (correct ? "correct" : "incorrect");
   feedbackAnswer.textContent = `Answer: ${answerText}`;
   feedbackQuality.textContent = resultLabel(correct, sessionRequeue);
-  el("next-card").focus();
+
+  dontKnowBtn.hidden = true;
+  nextCardBtn.hidden = false;
+  nextCardBtn.focus();
 }
 
 function resultLabel(correct, sessionRequeue) {
@@ -535,8 +543,8 @@ el("restart-session").addEventListener("click", () => {
   summaryPanel.hidden = true;
   startPanel.hidden = false;
 });
-el("dont-know").addEventListener("click", bail);
-el("next-card").addEventListener("click", nextCard);
+dontKnowBtn.addEventListener("click", bail);
+nextCardBtn.addEventListener("click", nextCard);
 
 el("toggle-manager").addEventListener("click", () => {
   const manager = el("deck-manager");
