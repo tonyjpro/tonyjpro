@@ -183,6 +183,7 @@ function startSession() {
     newCeiling: ceiling,
     strugglingIds: new Set(),
     cleanStreaks: new Map(), // per-card count of consecutive clean passes since its last miss/slow answer
+    seenIds: new Set(), // every card shown at least once this session, for distractor selection
     streak: 0,
     stats: { seen: 0, correct: 0, totalMs: 0 },
     current: null,
@@ -239,6 +240,8 @@ function showCurrentCard() {
     return;
   }
 
+  session.seenIds.add(card.id);
+
   const direction = pickDirection(settings.direction);
   const promptText = direction === "it-en" ? card.front : card.back;
   const answerText = direction === "it-en" ? card.back : card.front;
@@ -257,13 +260,21 @@ function showCurrentCard() {
 }
 
 function buildChoices(card, answerField, correctText) {
-  const pool = cards
-    .filter((c) => c.id !== card.id)
-    .map((c) => ({ id: c.id, text: c[answerField] }))
-    .filter((c, i, arr) => arr.findIndex((x) => x.text === c.text) === i)
-    .filter((c) => c.text !== correctText);
+  const dedupe = (list) =>
+    list.filter((c, i, arr) => arr.findIndex((x) => x.text === c.text) === i && c.text !== correctText);
 
-  const distractors = shuffle(pool).slice(0, NUM_CHOICES - 1);
+  const others = cards.filter((c) => c.id !== card.id).map((c) => ({ id: c.id, text: c[answerField] }));
+
+  // Distractors that have already appeared as some other card's correct
+  // answer this session are shown first. Otherwise, a word you recognize
+  // as "already confirmed correct" is a giveaway that it's the right
+  // choice, letting you skip actually recalling the current prompt — the
+  // pool is mostly words that were never in play this session at all.
+  // Mixing in already-seen words as decoys forces real recall instead.
+  const seen = session ? dedupe(others.filter((c) => session.seenIds.has(c.id))) : [];
+  const rest = dedupe(others.filter((c) => !session || !session.seenIds.has(c.id)));
+
+  const distractors = [...shuffle(seen), ...shuffle(rest)].slice(0, NUM_CHOICES - 1);
   const choices = shuffle([{ id: card.id, text: correctText }, ...distractors]);
   return choices;
 }

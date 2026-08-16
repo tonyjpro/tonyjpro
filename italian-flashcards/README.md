@@ -64,6 +64,16 @@ Cards are multiple choice: the correct translation plus distractors pulled
 from the rest of your deck, tap/click to answer. Response time is measured
 from when the card appears to when you tap a choice.
 
+Distractors are drawn from words that have already turned up as a correct
+answer earlier in the session, whenever there are enough of them, instead
+of uniformly from the whole deck. Otherwise a word you recognize as
+"already confirmed correct" is a giveaway all by itself — most of the deck
+was never even in play this session, so a vaguely-familiar option stands
+out without you needing to actually know the current word. Once a session
+gets going, every choice on screen — including the right one — is a word
+you've already seen be correct at least once, so familiarity alone stops
+being a shortcut.
+
 ## Session length
 
 A session doesn't pre-load a fixed number of cards. It starts with a
