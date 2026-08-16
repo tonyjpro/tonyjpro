@@ -47,6 +47,10 @@ const feedbackQuality = el("feedback-quality");
 const directionSelect = el("direction-select");
 const dontKnowBtn = el("dont-know");
 const nextCardBtn = el("next-card");
+const celebrateLeft = el("celebrate-left");
+const celebrateRight = el("celebrate-right");
+
+const CELEBRATE_EMOJI = ["🎉", "🎆", "🎇", "✨", "🔥", "⭐", "👏", "💯"];
 
 function loadCards() {
   try {
@@ -253,6 +257,7 @@ function showCurrentCard() {
   dontKnowBtn.hidden = false;
   dontKnowBtn.disabled = false;
   nextCardBtn.hidden = true;
+  resetCelebration();
 
   const choices = buildChoices(card, answerField, answerText);
   renderChoices(choices);
@@ -357,6 +362,27 @@ function showFeedback(correct, answerText, sessionRequeue) {
   dontKnowBtn.hidden = true;
   nextCardBtn.hidden = false;
   nextCardBtn.focus();
+
+  if (correct) celebrate();
+}
+
+function celebrate() {
+  celebrateLeft.textContent = shuffle(CELEBRATE_EMOJI)[0];
+  celebrateRight.textContent = shuffle(CELEBRATE_EMOJI)[0];
+  // Restart the CSS animation even if it's already mid-run from a fast
+  // streak of correct answers: drop the class, force a reflow, re-add it.
+  celebrateLeft.classList.remove("pop");
+  celebrateRight.classList.remove("pop");
+  void celebrateLeft.offsetWidth;
+  celebrateLeft.classList.add("pop");
+  celebrateRight.classList.add("pop");
+}
+
+function resetCelebration() {
+  celebrateLeft.classList.remove("pop");
+  celebrateRight.classList.remove("pop");
+  celebrateLeft.textContent = "";
+  celebrateRight.textContent = "";
 }
 
 function resultLabel(correct, sessionRequeue) {
