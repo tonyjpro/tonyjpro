@@ -58,6 +58,29 @@ Cards are multiple choice: the correct translation plus distractors pulled
 from the rest of your deck, tap/click to answer. Response time is measured
 from when the card appears to when you tap a choice.
 
+## Session length
+
+A session doesn't pre-load a fixed number of cards. It starts with a
+modest batch (10 new cards, plus anything already due), then adapts as
+you go:
+
+- New cards keep dripping in — up to a ceiling (45 by default, see
+  "New cards per session" below) — as long as you're not already
+  juggling several struggling ones.
+- Once 4 cards are actively being drilled at the same time, new intake
+  pauses so you're not piling on more unfamiliar material mid-struggle.
+- Once you've cleared a floor of 15 new cards and strung together 6
+  clean passes in a row, the session stops feeding you more and wraps
+  up as soon as the queue drains — instead of padding out to the
+  ceiling regardless of how well it's going.
+
+In practice: a session where everything's easy ends quickly; a session
+where several words are giving you trouble runs longer, with those
+words cycling back repeatedly until they stick, exactly the "harder
+ones stay in circulation, easy ones drop off" behavior the interval
+scheduling is built around — just visible within a single session, not
+only across days.
+
 ## Direction
 
 Use the direction selector to choose:
@@ -74,7 +97,7 @@ Open **Manage deck** to:
 - Import a JSON file of `{ front, back }` pairs — matching Italian words
   keep their existing progress, new ones are added fresh
 - Reset all progress (keeps your card list, restarts scheduling)
-- Set how many brand-new cards can enter a single session
+- Set the ceiling on new cards per session (see "Session length" above)
 
 ### Auto top-up
 

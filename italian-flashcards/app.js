@@ -10,12 +10,12 @@ import { STARTER_WORDS, RESERVE_WORDS } from "./words.js";
 const CARDS_KEY = "italian-flashcards.cards.v1";
 const SETTINGS_KEY = "italian-flashcards.settings.v1";
 const MAX_RESPONSE_MS = 20000;
-const MAX_SESSION_SIZE = 60;
+const MAX_SESSION_SIZE = 180;
 const NUM_CHOICES = 6;
 const TARGET_ACTIVE_POOL = 40; // keep at least this many not-yet-mastered cards around
 const TOPUP_BATCH = 10; // add at most this many reserve words per top-up
 
-const defaultSettings = { newPerSession: 15, direction: "it-en" };
+const defaultSettings = { newPerSession: 45, direction: "it-en" };
 
 let cards = loadCards();
 saveCards();
@@ -129,30 +129,41 @@ function topUpDeck() {
 }
 
 // --- Session ---
+//
+// The queue isn't fully pre-built: it starts with a modest batch of new
+// cards plus everything already due, then adapts as you go. New cards
+// keep dripping in (up to the session's ceiling) as long as you're not
+// juggling too many struggling ones already — but once you've cleared
+// the floor and strung together a solid streak of clean passes, the
+// session stops feeding you more and wraps up instead of padding out
+// to the ceiling regardless.
+
+const INITIAL_NEW_BATCH = 10; // new cards to seed the queue with before adapting
+const MASTERY_STREAK_LEN = 6; // consecutive clean passes that signal "you've got this"
+const MAX_CONCURRENT_STRUGGLING = 4; // pause new intake once this many cards are actively being drilled
 
 function pickDirection(cardSetting) {
   if (cardSetting === "mixed") return Math.random() < 0.5 ? "it-en" : "en-it";
   return cardSetting;
 }
 
-function buildQueue() {
+function startSession() {
   const now = Date.now();
   const due = cards.filter((c) => isDue(c, now));
-  const fresh = due.filter((c) => c.totalReviews === 0);
-  const seenDue = due.filter((c) => c.totalReviews > 0);
+  const fresh = shuffle(due.filter((c) => c.totalReviews === 0));
+  const seenDue = shuffle(due.filter((c) => c.totalReviews > 0));
 
-  const newSlice = shuffle(fresh).slice(0, settings.newPerSession);
-  let combined = shuffle([...seenDue, ...newSlice]);
+  const ceiling = Math.min(settings.newPerSession, fresh.length);
+  const initialNewCount = Math.min(INITIAL_NEW_BATCH, ceiling);
+  const initialNew = fresh.slice(0, initialNewCount);
+  const newPool = fresh.slice(initialNewCount, ceiling).map((c) => c.id);
+
+  let combined = shuffle([...seenDue, ...initialNew]);
   if (combined.length > MAX_SESSION_SIZE) {
     combined = combined.slice(0, MAX_SESSION_SIZE);
   }
-  return combined.map((c) => c.id);
-}
 
-function startSession() {
-  const queue = buildQueue();
-  if (queue.length === 0) {
-    const now = Date.now();
+  if (combined.length === 0) {
     const next = cards
       .map((c) => c.due)
       .filter((d) => d > now)
@@ -164,8 +175,13 @@ function startSession() {
   }
 
   session = {
-    queue,
+    queue: combined.map((c) => c.id),
     index: 0,
+    newPool,
+    newIntroduced: initialNewCount,
+    newCeiling: ceiling,
+    strugglingIds: new Set(),
+    streak: 0,
     stats: { seen: 0, correct: 0, totalMs: 0 },
     current: null,
   };
@@ -174,6 +190,21 @@ function startSession() {
   summaryPanel.hidden = true;
   cardPanel.hidden = false;
   showCurrentCard();
+}
+
+function maybeIntroduceNewCard() {
+  if (!session || session.newPool.length === 0) return;
+  if (session.newIntroduced >= session.newCeiling) return;
+  if (session.strugglingIds.size >= MAX_CONCURRENT_STRUGGLING) return;
+
+  const floor = Math.min(15, session.newCeiling);
+  if (session.streak >= MASTERY_STREAK_LEN && session.newIntroduced >= floor) return;
+
+  const nextId = session.newPool.shift();
+  session.newIntroduced++;
+  const offset = 2 + Math.floor(Math.random() * 3); // 2-4 cards ahead
+  const insertAt = Math.min(session.index + offset, session.queue.length);
+  session.queue.splice(insertAt, 0, nextId);
 }
 
 function findCard(id) {
@@ -272,10 +303,17 @@ function gradeAnswer(correct, chosenBtnEl) {
   session.stats.totalMs += responseMs;
 
   if (result.sessionRequeue) {
+    session.strugglingIds.add(card.id);
+    session.streak = 0;
     const offset = 3 + Math.floor(Math.random() * 4); // 3-6 cards later
     const insertAt = Math.min(session.index + offset, session.queue.length);
     session.queue.splice(insertAt, 0, card.id);
+  } else {
+    session.strugglingIds.delete(card.id);
+    session.streak++;
   }
+
+  maybeIntroduceNewCard();
 
   showFeedback(correct, answerText, result.quality);
 }
