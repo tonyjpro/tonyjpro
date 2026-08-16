@@ -32,8 +32,8 @@ export const STARTING_EASE = 2.5;
 // know it" (quality 5); answer under it but not blazing fast, still solid
 // (quality 4); answer at or past it (even if correct) counts as "you don't
 // really know this yet" and the card goes back into frequent rotation.
-export const INSTANT_MS = 1000;
-export const KNOWN_MS = 2000;
+export const INSTANT_MS = 2000;
+export const KNOWN_MS = 3000;
 
 // Weight for the exponential moving average of a card's response time.
 // Purely informational (shown in the deck manager) -- not used for grading.

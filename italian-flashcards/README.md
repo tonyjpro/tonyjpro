@@ -41,15 +41,15 @@ comparing against your own past pace on that specific word:
 
 | Your answer | Quality | Effect |
 |---|---|---|
-| Correct, under 1 second | 5 | Interval grows the most; card graduates fastest |
-| Correct, under 2 seconds | 4 | Normal interval growth |
-| Correct, but 2 seconds or slower | 3 | Counts as "you don't really know this yet" — barely grows the interval, and the card keeps circulating |
+| Correct, under 2 seconds | 5 | Interval grows the most; card graduates fastest |
+| Correct, under 3 seconds | 4 | Normal interval growth |
+| Correct, but 3 seconds or slower | 3 | Counts as "you don't really know this yet" — barely grows the interval, and the card keeps circulating |
 | Incorrect (or "I don't know") | 0 | Resets to the learning queue, interval drops to 0, ease is penalized |
 
-Anything scoring below quality 4 — a miss, or a correct answer that took 2
+Anything scoring below quality 4 — a miss, or a correct answer that took 3
 seconds or longer — doesn't just get shown again once. With six choices on
 screen, a single lucky guess after a miss is a real possibility, so a card
-that's ever scored below 4 has to be answered cleanly (under 2 seconds)
+that's ever scored below 4 has to be answered cleanly (under 3 seconds)
 **three times in a row** before it's treated as consolidated and stops
 circulating. Any wobble — a miss, or another slow answer — resets that
 count. That's the "if I don't know it fast enough, keep drilling it until

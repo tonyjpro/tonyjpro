@@ -51,7 +51,7 @@ test("fast correct answers advance faster than slow correct answers", () => {
   // other answers slow-but-correct every time.
   for (let i = 0; i < 3; i++) {
     fast = schedule(fast, { correct: true, responseMs: 400, now: NOW }).card;
-    slow = schedule(slow, { correct: true, responseMs: 3000, now: NOW }).card;
+    slow = schedule(slow, { correct: true, responseMs: KNOWN_MS + 500, now: NOW }).card;
   }
 
   assert.ok(
