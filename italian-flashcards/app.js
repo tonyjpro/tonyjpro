@@ -6,6 +6,7 @@ import {
   isMastered,
 } from "./srs.js";
 import { STARTER_WORDS, RESERVE_WORDS } from "./words.js";
+import { EXAMPLE_SENTENCES } from "./examples.js";
 
 const CARDS_KEY = "italian-flashcards.cards.v1";
 const SETTINGS_KEY = "italian-flashcards.settings.v1";
@@ -44,6 +45,9 @@ const feedbackEl = el("feedback");
 const feedbackVerdict = el("feedback-verdict");
 const feedbackAnswer = el("feedback-answer");
 const feedbackQuality = el("feedback-quality");
+const feedbackExample = el("feedback-example");
+const feedbackExampleEn = el("feedback-example-en");
+const feedbackExampleIt = el("feedback-example-it");
 const directionSelect = el("direction-select");
 const dontKnowBtn = el("dont-know");
 const nextCardBtn = el("next-card");
@@ -359,21 +363,41 @@ function gradeAnswer(correct, chosenBtnEl) {
   // to the front of the queue, not more competition for the same slots.
   if (correct) maybeIntroduceNewCard();
 
-  showFeedback(correct, answerText, result.sessionRequeue);
+  showFeedback(correct, answerText, result.sessionRequeue, card);
 }
 
-function showFeedback(correct, answerText, sessionRequeue) {
+function showFeedback(correct, answerText, sessionRequeue, card) {
   feedbackEl.hidden = false;
   feedbackVerdict.textContent = correct ? "Correct" : "Not quite";
   feedbackVerdict.className = "feedback-verdict " + (correct ? "correct" : "incorrect");
   feedbackAnswer.textContent = `Answer: ${answerText}`;
   feedbackQuality.textContent = resultLabel(correct, sessionRequeue);
+  showExample(card);
 
   dontKnowBtn.hidden = true;
   nextCardBtn.hidden = false;
   nextCardBtn.focus();
 
   if (correct) celebrate();
+}
+
+function showExample(card) {
+  const pair = EXAMPLE_SENTENCES[card.front];
+  if (!pair) {
+    feedbackExample.hidden = true;
+    return;
+  }
+  const [en, it] = pair;
+  feedbackExampleEn.innerHTML = highlightHtml(en);
+  feedbackExampleIt.innerHTML = highlightHtml(it);
+  feedbackExample.hidden = false;
+}
+
+// Escapes the sentence first (this is app-authored content from
+// examples.js, not user input, but escaping is still cheap insurance),
+// then converts **word** markers into <mark> highlights.
+function highlightHtml(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<mark>$1</mark>");
 }
 
 function celebrate() {

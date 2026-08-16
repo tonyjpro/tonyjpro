@@ -304,6 +304,37 @@ input[type="number"] {
   margin-bottom: 1rem;
 }
 
+.feedback-example {
+  border-top: 1px solid var(--border);
+  padding-top: 0.85rem;
+  margin-top: 0.15rem;
+  text-align: left;
+}
+
+.feedback-example-en,
+.feedback-example-it {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.feedback-example-en {
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.feedback-example-it {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.feedback-example mark {
+  background: rgba(91, 141, 239, 0.28);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.05em 0.25em;
+}
+
 #summary-panel {
   text-align: center;
 }
