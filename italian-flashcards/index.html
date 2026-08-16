@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Italian Flashcards</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="title-row">
+      <h1>Italian Flashcards</h1>
+      <button id="toggle-manager" class="btn btn-ghost" type="button">Manage deck</button>
+    </div>
+    <dl class="stats-bar" id="stats-bar" aria-label="Deck stats">
+      <div><dt>Due</dt><dd id="stat-due">0</dd></div>
+      <div><dt>Learning</dt><dd id="stat-learning">0</dd></div>
+      <div><dt>Mastered</dt><dd id="stat-mastered">0</dd></div>
+      <div><dt>Total</dt><dd id="stat-total">0</dd></div>
+    </dl>
+  </header>
+
+  <main id="session-area">
+    <section id="start-panel" class="panel">
+      <p id="start-message">Ready when you are.</p>
+      <div class="field-row">
+        <label for="direction-select">Direction</label>
+        <select id="direction-select">
+          <option value="it-en">Italian &rarr; English</option>
+          <option value="en-it">English &rarr; Italian</option>
+          <option value="mixed">Mixed</option>
+        </select>
+      </div>
+      <button id="start-session" class="btn btn-primary" type="button">Start session</button>
+    </section>
+
+    <section id="card-panel" class="panel" hidden>
+      <div class="session-progress">
+        <span id="progress-label">0 / 0</span>
+      </div>
+
+      <div class="card">
+        <div class="card-prompt-label" id="prompt-label">Italian</div>
+        <div class="card-prompt" id="card-prompt">&nbsp;</div>
+
+        <div id="choices" class="choices" role="group" aria-label="Answer choices"></div>
+        <div class="button-row">
+          <button type="button" id="dont-know" class="btn btn-ghost">I don't know</button>
+        </div>
+
+        <div id="feedback" class="feedback" hidden>
+          <div id="feedback-verdict" class="feedback-verdict"></div>
+          <div id="feedback-answer" class="feedback-answer"></div>
+          <div id="feedback-quality" class="feedback-quality"></div>
+          <button id="next-card" class="btn btn-primary" type="button">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="summary-panel" class="panel" hidden>
+      <h2>Session complete</h2>
+      <div id="summary-stats"></div>
+      <button id="restart-session" class="btn btn-primary" type="button">Start another session</button>
+    </section>
+  </main>
+
+  <aside id="deck-manager" hidden>
+    <h2>Deck manager</h2>
+
+    <section class="manager-section">
+      <h3>Settings</h3>
+      <div class="field-row">
+        <label for="new-per-session">New cards per session</label>
+        <input id="new-per-session" type="number" min="1" max="100" />
+      </div>
+    </section>
+
+    <section class="manager-section">
+      <h3>Add a card</h3>
+      <form id="add-card-form" class="field-row" autocomplete="off">
+        <input id="add-front" type="text" placeholder="Italian" required />
+        <input id="add-back" type="text" placeholder="English" required />
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+    </section>
+
+    <section class="manager-section">
+      <h3>Backup</h3>
+      <div class="button-row">
+        <button id="export-deck" class="btn btn-ghost" type="button">Export JSON</button>
+        <button id="import-deck-btn" class="btn btn-ghost" type="button">Import JSON</button>
+        <input id="import-deck-file" type="file" accept="application/json" hidden />
+      </div>
+      <div class="button-row">
+        <button id="reset-progress" class="btn btn-danger" type="button">Reset all progress</button>
+      </div>
+    </section>
+
+    <section class="manager-section">
+      <h3>Cards</h3>
+      <div class="table-wrap">
+        <table id="cards-table">
+          <thead>
+            <tr>
+              <th>Italian</th>
+              <th>English</th>
+              <th>Status</th>
+              <th>Avg time</th>
+              <th>Accuracy</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cards-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </aside>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
