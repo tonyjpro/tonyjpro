@@ -1,4 +1,5 @@
-// Spaced-repetition scheduler with a response-time signal.
+// Spaced-repetition scheduler, correctness-only (no time pressure -- see
+// the note below).
 //
 // Two tiers, same idea as Anki:
 //   - "learning" cards are drilled again within minutes, in frequent rotation,
@@ -6,15 +7,22 @@
 //   - "review" cards are graduated cards on a growing SM-2 style interval
 //     (days), so well-known words are shown less and less often.
 //
-// The extra ingredient: correctness alone is graded into a 0-5 "quality"
-// score using a flat response-time bar, not a per-card average. Every card
-// is answered from the same 6-choice format, so the read-the-options
-// overhead is roughly constant card to card -- a fixed cutoff is a fairer
-// "do you actually know this" signal than comparing to your own past pace
-// on that specific word. Answering well under the bar pushes the interval
-// out the most; answering correctly but slower barely grows it and keeps
-// the card in frequent rotation until it's passed cleanly several times in
-// a row; an incorrect answer resets it into the learning queue.
+// A card has to be answered correctly through *every* learning step (see
+// LEARNING_STEPS_MS) before it's allowed to leave the current session's
+// rotation -- so a freshly-introduced word sticks around for a couple of
+// passes rather than vanishing the instant you get it right once, and a
+// miss resets it back to the first step, which naturally requires those
+// same couple of clean passes again before it drops off. Once graduated,
+// growth is the plain SM-2 progression (1 day, 6 days, then interval*ease),
+// which is gradual by construction -- there's no separate "fast track."
+//
+// Response time isn't part of grading right now: it made a correct answer
+// feel like it could still be marked "not known" just for taking a beat to
+// read the choices, which is stressful and not a great signal on its own.
+// The scheduler still records how long each correct answer took
+// (avgTimeMs) purely as an informational stat -- a time-based signal is a
+// good candidate to bring back deliberately in a later revision (see the
+// "Ideas for later" section of the README), alongside real scoring.
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const MINUTE_MS = 60 * 1000;
@@ -27,13 +35,6 @@ export const LEARNING_STEPS_MS = [1 * MINUTE_MS, 10 * MINUTE_MS];
 export const GRADUATING_INTERVAL_DAYS = 1;
 export const MIN_EASE = 1.3;
 export const STARTING_EASE = 2.5;
-
-// Flat response-time bar: answer well under this and it counts as "you
-// know it" (quality 5); answer under it but not blazing fast, still solid
-// (quality 4); answer at or past it (even if correct) counts as "you don't
-// really know this yet" and the card goes back into frequent rotation.
-export const INSTANT_MS = 2000;
-export const KNOWN_MS = 3000;
 
 // Weight for the exponential moving average of a card's response time.
 // Purely informational (shown in the deck manager) -- not used for grading.
@@ -57,15 +58,12 @@ export function createCard({ id, front, back, now = Date.now() }) {
 }
 
 /**
- * Grades a single answer into an SM-2 style quality score (0-5) using a
- * flat response-time bar: under KNOWN_MS counts as known, at or past it
- * (even if correct) counts as not confidently known yet.
+ * Grades a single answer into an SM-2 style quality score: 4 (solid pass)
+ * for correct, 0 (miss) for incorrect or "I don't know". Correctness-only
+ * -- see the file header for why time isn't a factor right now.
  */
-export function computeQuality(correct, responseMs) {
-  if (!correct) return 0;
-  if (responseMs <= INSTANT_MS) return 5;
-  if (responseMs <= KNOWN_MS) return 4;
-  return 3;
+export function computeQuality(correct) {
+  return correct ? 4 : 0;
 }
 
 function nextAvgTime(avgTimeMs, responseMs) {
@@ -82,7 +80,7 @@ function nextAvgTime(avgTimeMs, responseMs) {
  * rather than waiting for its persisted `due` timestamp.
  */
 export function schedule(card, { correct, responseMs, now = Date.now() }) {
-  const quality = computeQuality(correct, responseMs);
+  const quality = computeQuality(correct);
   const updated = { ...card };
 
   if (quality < 3) {
@@ -121,9 +119,11 @@ export function schedule(card, { correct, responseMs, now = Date.now() }) {
   updated.totalReviews = card.totalReviews + 1;
   updated.totalCorrect = card.totalCorrect + (correct ? 1 : 0);
 
-  // Anything less than a clean, fast pass gets drilled again soon in this
-  // same session, on top of whatever its persisted `due` schedule says.
-  const sessionRequeue = quality < 4;
+  // Requeue in-session on a miss, or if the card hasn't cleared every
+  // learning step yet -- so a fresh word needs a couple of clean passes
+  // before it's allowed to drop off, and a miss requires those same couple
+  // of passes again (learningStep resets to 0 above) before it does.
+  const sessionRequeue = quality < 4 || updated.learningStep != null;
 
   return { card: updated, quality, sessionRequeue };
 }

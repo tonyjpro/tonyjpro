@@ -10,12 +10,12 @@ import { STARTER_WORDS, RESERVE_WORDS } from "./words.js";
 const CARDS_KEY = "italian-flashcards.cards.v1";
 const SETTINGS_KEY = "italian-flashcards.settings.v1";
 const MAX_RESPONSE_MS = 20000;
-const MAX_SESSION_SIZE = 180;
+const MAX_SESSION_SIZE = 90;
 const NUM_CHOICES = 6;
-const TARGET_ACTIVE_POOL = 40; // keep at least this many not-yet-mastered cards around
-const TOPUP_BATCH = 10; // add at most this many reserve words per top-up
+const TARGET_ACTIVE_POOL = 25; // keep at least this many not-yet-mastered cards around
+const TOPUP_BATCH = 5; // add at most this many reserve words per top-up
 
-const defaultSettings = { newPerSession: 45, direction: "it-en" };
+const defaultSettings = { newPerSession: 20, direction: "it-en" };
 
 let cards = loadCards();
 saveCards();
@@ -139,9 +139,8 @@ function topUpDeck() {
 // to the ceiling regardless.
 
 const INITIAL_NEW_BATCH = 5; // new cards to seed the queue with before adapting
-const MASTERY_STREAK_LEN = 6; // consecutive clean passes that signal "you've got this"
-const MAX_CONCURRENT_STRUGGLING = 4; // pause new intake once this many cards are actively being drilled
-const REPS_TO_CONSOLIDATE = 3; // consecutive clean passes a missed/slow card needs before it's considered locked in
+const MASTERY_STREAK_LEN = 5; // consecutive clean passes that signal "you've got this"
+const MAX_CONCURRENT_STRUGGLING = 3; // pause new intake once this many cards are actively being drilled
 
 function pickDirection(cardSetting) {
   if (cardSetting === "mixed") return Math.random() < 0.5 ? "it-en" : "en-it";
@@ -181,8 +180,7 @@ function startSession() {
     newPool,
     newIntroduced: initialNewCount,
     newCeiling: ceiling,
-    strugglingIds: new Set(),
-    cleanStreaks: new Map(), // per-card count of consecutive clean passes since its last miss/slow answer
+    strugglingIds: new Set(), // cards not yet done with this session's requeue rotation
     seenIds: new Set(), // every card shown at least once this session, for distractor selection
     streak: 0,
     stats: { seen: 0, correct: 0, totalMs: 0 },
@@ -206,7 +204,7 @@ function maybeIntroduceNewCard() {
   if (session.newIntroduced >= session.newCeiling) return;
   if (session.strugglingIds.size >= MAX_CONCURRENT_STRUGGLING) return;
 
-  const floor = Math.min(15, session.newCeiling);
+  const floor = Math.min(10, session.newCeiling);
   if (session.streak >= MASTERY_STREAK_LEN && session.newIntroduced >= floor) return;
 
   const nextId = session.newPool.shift();
@@ -322,47 +320,41 @@ function gradeAnswer(correct, chosenBtnEl) {
   session.stats.totalMs += responseMs;
 
   if (result.sessionRequeue) {
+    // Either a miss, or the card hasn't cleared every learning step yet --
+    // srs.js already encodes "needs another clean pass" in that flag, so
+    // there's nothing extra to track here.
     session.strugglingIds.add(card.id);
-    session.cleanStreaks.set(card.id, 0);
-    session.streak = 0;
     requeueCardSoon(card.id);
   } else {
-    session.streak++;
-    if (session.strugglingIds.has(card.id)) {
-      // This card was missed or hesitant earlier this session — one clean
-      // pass isn't enough proof (with 6-way multiple choice, it could be a
-      // lucky guess), so keep it circulating until it's passed cleanly
-      // several times in a row.
-      const cleanCount = (session.cleanStreaks.get(card.id) || 0) + 1;
-      if (cleanCount < REPS_TO_CONSOLIDATE) {
-        session.cleanStreaks.set(card.id, cleanCount);
-        requeueCardSoon(card.id);
-      } else {
-        session.strugglingIds.delete(card.id);
-        session.cleanStreaks.delete(card.id);
-      }
-    }
+    session.strugglingIds.delete(card.id);
   }
+
+  // Tracked separately from strugglingIds: a fresh card's first correct
+  // answer still needs another pass to graduate (so it stays in
+  // strugglingIds), but it's still a correct answer and should still
+  // count toward "how many in a row have you gotten right" -- otherwise
+  // introducing new cards would constantly reset this and a session where
+  // you're doing great would never detect its own mastery.
+  session.streak = correct ? session.streak + 1 : 0;
 
   maybeIntroduceNewCard();
 
-  showFeedback(correct, answerText, result.quality);
+  showFeedback(correct, answerText, result.sessionRequeue);
 }
 
-function showFeedback(correct, answerText, quality) {
+function showFeedback(correct, answerText, sessionRequeue) {
   feedbackEl.hidden = false;
   feedbackVerdict.textContent = correct ? "Correct" : "Not quite";
   feedbackVerdict.className = "feedback-verdict " + (correct ? "correct" : "incorrect");
   feedbackAnswer.textContent = `Answer: ${answerText}`;
-  feedbackQuality.textContent = qualityLabel(correct, quality);
+  feedbackQuality.textContent = resultLabel(correct, sessionRequeue);
   el("next-card").focus();
 }
 
-function qualityLabel(correct, quality) {
+function resultLabel(correct, sessionRequeue) {
   if (!correct) return "Marked as missed — you'll see this again soon.";
-  if (quality === 5) return "Fast! This one will show up less often.";
-  if (quality === 4) return "Good — solid pace.";
-  return "Correct, but slow — you'll see this again soon to lock it in.";
+  if (sessionRequeue) return "Correct — you'll see this again shortly to lock it in.";
+  return "Correct — nicely done. This one will show up less often now.";
 }
 
 function nextCard() {

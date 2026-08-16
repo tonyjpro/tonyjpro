@@ -1,9 +1,10 @@
 # Italian Flashcards
 
-A spaced-repetition flashcard app for learning Italian vocabulary, where
-**how fast you answer** matters as much as whether you got it right. Answer
-a word quickly and correctly and it drops into infrequent rotation; answer
-slowly, or miss it, and it comes back around soon until it's solid.
+A spaced-repetition flashcard app for learning Italian vocabulary. Answer a
+word correctly and it drops into infrequent rotation; miss it, or tap "I
+don't know", and it comes back around until it's solid. Grading is
+correctness-only right now — no timer, no pressure (see "Ideas for later"
+for why, and where that's headed).
 
 Runs entirely in the browser — no build step, no account, no server-side
 storage. Your progress lives in `localStorage`.
@@ -23,37 +24,24 @@ tiny built-in static server — no dependencies required beyond Node.)
 
 Each card moves through two tiers, similar to Anki:
 
-- **Learning** — a new or recently-missed card. It's shown again within
-  minutes (1 min, then 10 min), and interleaved a few cards later within
-  the *same session* so it stays in frequent rotation until you're solid
-  on it.
+- **Learning** — a new or recently-missed card. It has to be answered
+  correctly through *every* learning step (currently 2: 1 min, then 10
+  min) before it graduates, and each of those passes is also interleaved
+  a few cards later within the *same session* — so a fresh word sticks
+  around for a couple of exposures rather than vanishing the instant you
+  get it right once, and a miss resets it to the first step, requiring
+  those same couple of clean passes again before it drops off.
 - **Review** — a graduated card on a growing interval, in days. Each
-  correct review multiplies the interval by an ease factor, so the better
-  you know a word, the longer until it resurfaces.
+  correct review multiplies the interval by an ease factor. Since grading
+  is correctness-only (see below), that growth is the plain, gradual SM-2
+  progression — there's no "fast track" for a snappy answer, so known
+  words fade out of rotation gradually rather than jumping straight to a
+  long interval.
 
-### Where response time comes in
-
-Every answer is graded 0–5 (SM-2 style "quality") against a flat response
-time bar, not a per-card average. Every card uses the same 6-choice format,
-so the "read the options" overhead is roughly constant from card to card —
-a fixed cutoff is a fairer "do you actually know this" signal than
-comparing against your own past pace on that specific word:
-
-| Your answer | Quality | Effect |
-|---|---|---|
-| Correct, under 2 seconds | 5 | Interval grows the most; card graduates fastest |
-| Correct, under 3 seconds | 4 | Normal interval growth |
-| Correct, but 3 seconds or slower | 3 | Counts as "you don't really know this yet" — barely grows the interval, and the card keeps circulating |
-| Incorrect (or "I don't know") | 0 | Resets to the learning queue, interval drops to 0, ease is penalized |
-
-Anything scoring below quality 4 — a miss, or a correct answer that took 3
-seconds or longer — doesn't just get shown again once. With six choices on
-screen, a single lucky guess after a miss is a real possibility, so a card
-that's ever scored below 4 has to be answered cleanly (under 3 seconds)
-**three times in a row** before it's treated as consolidated and stops
-circulating. Any wobble — a miss, or another slow answer — resets that
-count. That's the "if I don't know it fast enough, keep drilling it until
-I really do" behavior.
+Grading is binary: correct (a solid pass) or incorrect/"I don't know" (a
+miss — full reset, and the card recycles). Response time isn't measured
+against the grade at all — see "Ideas for later" for why, and where a
+time-based signal is headed next.
 
 The scheduler itself lives in `srs.js` and has no UI dependencies —
 `srs.test.mjs` covers it directly with `node --test`.
@@ -61,8 +49,10 @@ The scheduler itself lives in `srs.js` and has no UI dependencies —
 ## Answering
 
 Cards are multiple choice: the correct translation plus distractors pulled
-from the rest of your deck, tap/click to answer. Response time is measured
-from when the card appears to when you tap a choice.
+from the rest of your deck, tap/click to answer. If you genuinely don't
+know it, tap **I don't know** rather than guessing — that's what actually
+tells the scheduler to recycle the card; grading isn't timed, so there's
+no cost to taking a moment to think.
 
 Distractors are drawn from words that have already turned up as a correct
 answer earlier in the session, whenever there are enough of them, instead
@@ -76,26 +66,24 @@ being a shortcut.
 
 ## Session length
 
-A session doesn't pre-load a fixed number of cards. It starts with a
-modest batch (10 new cards, plus anything already due), then adapts as
-you go:
+A session doesn't pre-load a fixed number of cards. It starts with a small
+batch (5 new cards, plus anything already due) and adapts as you go, on
+purpose kept fairly small so recognition stays fast:
 
-- New cards keep dripping in — up to a ceiling (45 by default, see
-  "New cards per session" below) — as long as you're not already
-  juggling several struggling ones.
-- Once 4 cards are actively being drilled at the same time, new intake
+- New cards keep dripping in — up to a ceiling (20 by default, see "New
+  cards per session" below) — as long as you're not already juggling
+  several struggling ones.
+- Once 3 cards are actively being drilled at the same time, new intake
   pauses so you're not piling on more unfamiliar material mid-struggle.
-- Once you've cleared a floor of 15 new cards and strung together 6
-  clean passes in a row, the session stops feeding you more and wraps
-  up as soon as the queue drains — instead of padding out to the
-  ceiling regardless of how well it's going.
+- Once you've cleared a floor of 10 new cards and strung together 5
+  correct answers in a row, the session stops feeding you more and wraps
+  up as soon as the queue drains — instead of padding out to the ceiling
+  regardless of how well it's going.
 
-In practice: a session where everything's easy ends quickly; a session
-where several words are giving you trouble runs longer, with those
-words cycling back repeatedly until they stick, exactly the "harder
-ones stay in circulation, easy ones drop off" behavior the interval
-scheduling is built around — just visible within a single session, not
-only across days.
+In practice: a session where everything's easy ends quickly (though every
+word still gets its required couple of passes — see "How the scheduling
+works"); a session where several words are giving you trouble runs longer,
+with those words cycling back repeatedly until they stick.
 
 ## Direction
 
@@ -119,7 +107,7 @@ Open **Manage deck** to:
 
 As your words graduate into infrequent ("mastered") rotation, the app
 automatically pulls fresh words from a larger reserve list (`words.js`,
-`RESERVE_WORDS`) to keep at least ~40 active (not-yet-mastered) cards in
+`RESERVE_WORDS`) to keep at least ~25 active (not-yet-mastered) cards in
 your deck. You don't need to keep adding words yourself — bring your own
 starter list via Import (or by editing `words.js`) and the deck keeps
 itself topped up from there.
@@ -135,12 +123,24 @@ itself topped up from there.
 
 ## Ideas for later (not built yet)
 
+Response time used to factor into grading (v1 had a flat time bar, and
+before that a per-card adaptive average). Both were dropped: even a word
+you know cold takes a beat to spot among 6 choices, and knowing a slow
+answer would silently count against you turned answering into something
+stressful, working against the whole point of the app. Right now grading
+is correctness-only, and **I don't know** is the explicit, honest way to
+tell the scheduler a card needs recycling.
+
+The plan is to bring time back deliberately, in v2, alongside real scoring
+rather than as a silent grading input:
+
 - **Timed lifeline / decaying-score answering**, inspired by a trivia game:
   after ~2-3 seconds with no answer, grey out 2 of the wrong choices as a
   "you should know this by now" hint; after another 1-2 seconds, grey out
   2 more. Pair it with a points system where faster answers score higher
-  and each hint reveal cuts the max possible score. This is a scoring/UX
-  layer on top of answering — separate from the SRS scheduling itself, so
-  it needs a decision on whether an answer given after a hint appeared
-  should also grade as a lower SM-2 quality (probably yes, since needing
-  the hint is itself a sign you didn't know it fast).
+  and each hint reveal cuts the max possible score.
+- This is a scoring/UX layer on top of answering — separate from the SRS
+  scheduling itself — but it'll raise the same question again: should an
+  answer given after a hint appeared also grade as a weaker SM-2 pass?
+  Worth deciding deliberately next time, with the stress problem in mind
+  rather than retrofitting it the way v1 did.
